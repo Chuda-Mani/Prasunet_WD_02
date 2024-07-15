@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QuickTick Stopwatch</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="hero">
+        <div class="container">
+            <div class="clock">
+                <span id="hrs">00</span>
+                <span>:</span>
+                <span id="mins">00</span>
+                <span>:</span>
+                <span id="secs">00</span>
+            </div>
+            <div class="controls">
+                <button id="startStopBtn">Start</button>
+                <button id="resetBtn">Reset</button>
+                <button id="lapBtn">Lap</button>
+                <button id="splitBtn">Split</button>
+                <button id="themeBtn">Toggle Theme</button>
+            </div>
+            <div class="timer-settings">
+                <input type="number" id="setHrs" placeholder="HH" min="0">
+                <input type="number" id="setMins" placeholder="MM" min="0" max="59">
+                <input type="number" id="setSecs" placeholder="SS" min="0" max="59">
+                <button id="startCountdownBtn">Start Countdown</button>
+            </div>
+            <div class="laps">
+                <ul id="lapsList"></ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let hrs = document.getElementById("hrs");
+        let mins = document.getElementById("mins");
+        let secs = document.getElementById("secs");
+        let startStopBtn = document.getElementById("startStopBtn");
+        let resetBtn = document.getElementById("resetBtn");
+        let lapBtn = document.getElementById("lapBtn");
+        let splitBtn = document.getElementById("splitBtn");
+        let themeBtn = document.getElementById("themeBtn");
+        let startCountdownBtn = document.getElementById("startCountdownBtn");
+        let setHrs = document.getElementById("setHrs");
+        let setMins = document.getElementById("setMins");
+        let setSecs = document.getElementById("setSecs");
+        let lapsList = document.getElementById("lapsList");
+
+        let timerInterval;
+        let isRunning = false;
+        let isCountdown = false;
+        let startTime;
+        let elapsedTime = 0;
+        let countdownTime = 0;
+        let theme = 'dark';
+
+        function updateClock() {
+            let totalElapsedTime = elapsedTime;
+            if (isRunning) {
+                totalElapsedTime += Date.now() - startTime;
+            }
+
+            let hours = Math.floor(totalElapsedTime / 3600000);
+            let minutes = Math.floor((totalElapsedTime % 3600000) / 60000);
+            let seconds = Math.floor((totalElapsedTime % 60000) / 1000);
+
+            hrs.innerHTML = (hours < 10 ? "0" : "") + hours;
+            mins.innerHTML = (minutes < 10 ? "0" : "") + minutes;
+            secs.innerHTML = (seconds < 10 ? "0" : "") + seconds;
+        }
+
+        function startStopTimer() {
+            if (isRunning) {
+                elapsedTime += Date.now() - startTime;
+                clearInterval(timerInterval);
+                startStopBtn.innerText = "Start";
+            } else {
+                startTime = Date.now();
+                timerInterval = setInterval(updateClock, 1000);
+                startStopBtn.innerText = "Stop";
+            }
+            isRunning = !isRunning;
+        }
+
+        function resetTimer() {
+            clearInterval(timerInterval);
+            isRunning = false;
+            elapsedTime = 0;
+            updateClock();
+            startStopBtn.innerText = "Start";
+            lapsList.innerHTML = '';
+            localStorage.removeItem('laps');
+        }
+
+        function recordLap() {
+            if (isRunning) {
+                let lapTime = hrs.innerText + ":" + mins.innerText + ":" + secs.innerText;
+                let lapItem = document.createElement("li");
+                lapItem.innerText = "Lap: " + lapTime;
+                lapsList.appendChild(lapItem);
+                saveLaps();
+            }
+        }
+
+        function recordSplit() {
+            if (isRunning) {
+                let splitTime = hrs.innerText + ":" + mins.innerText + ":" + secs.innerText;
+                let splitItem = document.createElement("li");
+                splitItem.innerText = "Split: " + splitTime;
+                lapsList.appendChild(splitItem);
+                saveLaps();
+            }
+        }
+
+        function toggleTheme() {
+            if (theme === 'dark') {
+                document.documentElement.style.setProperty('--bg-color', '#fff');
+                document.documentElement.style.setProperty('--text-color', '#000');
+                theme = 'light';
+            } else {
+                document.documentElement.style.setProperty('--bg-color', '#08001f');
+                document.documentElement.style.setProperty('--text-color', '#fff');
+                theme = 'dark';
+            }
+        }
+
+        function startCountdown() {
+            let hours = parseInt(setHrs.value) || 0;
+            let minutes = parseInt(setMins.value) || 0;
+            let seconds = parseInt(setSecs.value) || 0;
+            countdownTime = (hours * 3600 + minutes * 60 + seconds) * 1000;
+            isCountdown = true;
+            startTime = Date.now();
+            timerInterval = setInterval(updateCountdown, 1000);
+            startStopBtn.innerText = "Stop";
+        }
+
+        function updateCountdown() {
+            let currentTime = Date.now();
+            let remainingTime = countdownTime - (currentTime - startTime);
+
+            if (remainingTime <= 0) {
+                clearInterval(timerInterval);
+                hrs.innerText = "00";
+                mins.innerText = "00";
+                secs.innerText = "00";
+                alert("Time's up!");
+                let audio = new Audio('alarm.mp3');
+                audio.play();
+                return;
+            }
+
+            let hours = Math.floor(remainingTime / 3600000);
+            let minutes = Math.floor((remainingTime % 3600000) / 60000);
+            let seconds = Math.floor((remainingTime % 60000) / 1000);
+
+            hrs.innerHTML = (hours < 10 ? "0" : "") + hours;
+            mins.innerHTML = (minutes < 10 ? "0" : "") + minutes;
+            secs.innerHTML = (seconds < 10 ? "0" : "") + seconds;
+        }
+
+        function saveLaps() {
+            let laps = [];
+            lapsList.querySelectorAll("li").forEach(lapItem => {
+                laps.push(lapItem.innerText);
+            });
+            localStorage.setItem('laps', JSON.stringify(laps));
+        }
+
+        function loadLaps() {
+            let laps = JSON.parse(localStorage.getItem('laps')) || [];
+            laps.forEach(lapText => {
+                let lapItem = document.createElement("li");
+                lapItem.innerText = lapText;
+                lapsList.appendChild(lapItem);
+            });
+        }
+
+        startStopBtn.addEventListener("click", startStopTimer);
+        resetBtn.addEventListener("click", resetTimer);
+        lapBtn.addEventListener("click", recordLap);
+        splitBtn.addEventListener("click", recordSplit);
+        themeBtn.addEventListener("click", toggleTheme);
+        startCountdownBtn.addEventListener("click", startCountdown);
+
+        loadLaps();
+        updateClock();
+    </script>
+</body>
+</html>
+
+
+<!-- <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QuickTick Stopwatch</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="hero">
+        <div class="container">
+            <div class="clock">
+                <span id="hrs">00</span>
+                <span>:</span>
+                <span id="mins">00</span>
+                <span>:</span>
+                <span id="secs">00</span>
+            </div>
+            <div class="controls">
+                <button id="startStopBtn">Start</button>
+                <button id="pauseResumeBtn" style="display:none;">Pause</button>
+                <button id="resetBtn">Reset</button>
+                <button id="lapBtn">Lap</button>
+                <button id="splitBtn">Split</button>
+                <button id="themeBtn">Toggle Theme</button>
+                <button id="saveSessionBtn">Save Session</button>
+                <button id="clearHistoryBtn">Clear History</button>
+            </div>
+            <div class="timer-settings">
+                <input type="number" id="setHrs" placeholder="HH" min="0">
+                <input type="number" id="setMins" placeholder="MM" min="0" max="59">
+                <input type="number" id="setSecs" placeholder="SS" min="0" max="59">
+                <button id="startCountdownBtn">Start Countdown</button>
+                <select id="alarmSound">
+                    <option value="alarm1.mp3">Alarm 1</option>
+                    <option value="alarm2.mp3">Alarm 2</option>
+                    <option value="alarm3.mp3">Alarm 3</option>
+                </select>
+            </div>
+            <div class="laps">
+                <ul id="lapsList"></ul>
+            </div>
+            <div class="history">
+                <h3>Previous Sessions</h3>
+                <ul id="historyList"></ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let hrs = document.getElementById("hrs");
+        let mins = document.getElementById("mins");
+        let secs = document.getElementById("secs");
+        let startStopBtn = document.getElementById("startStopBtn");
+        let pauseResumeBtn = document.getElementById("pauseResumeBtn");
+        let resetBtn = document.getElementById("resetBtn");
+        let lapBtn = document.getElementById("lapBtn");
+        let splitBtn = document.getElementById("splitBtn");
+        let themeBtn = document.getElementById("themeBtn");
+        let startCountdownBtn = document.getElementById("startCountdownBtn");
+        let saveSessionBtn = document.getElementById("saveSessionBtn");
+        let clearHistoryBtn = document.getElementById("clearHistoryBtn");
+        let setHrs = document.getElementById("setHrs");
+        let setMins = document.getElementById("setMins");
+        let setSecs = document.getElementById("setSecs");
+        let alarmSound = document.getElementById("alarmSound");
+        let lapsList = document.getElementById("lapsList");
+        let historyList = document.getElementById("historyList");
+
+        let timerInterval;
+        let isRunning = false;
+        let isCountdown = false;
+        let isPaused = false;
+        let startTime;
+        let elapsedTime = 0;
+        let countdownTime = 0;
+        let theme = 'dark';
+
+        function updateClock() {
+            let totalElapsedTime = elapsedTime;
+            if (isRunning) {
+                totalElapsedTime += Date.now() - startTime;
+            }
+
+            let hours = Math.floor(totalElapsedTime / 3600000);
+            let minutes = Math.floor((totalElapsedTime % 3600000) / 60000);
+            let seconds = Math.floor((totalElapsedTime % 60000) / 1000);
+
+            hrs.innerHTML = (hours < 10 ? "0" : "") + hours;
+            mins.innerHTML = (minutes < 10 ? "0" : "") + minutes;
+            secs.innerHTML = (seconds < 10 ? "0" : "") + seconds;
+        }
+
+        function startStopTimer() {
+            if (isRunning) {
+                elapsedTime += Date.now() - startTime;
+                clearInterval(timerInterval);
+                startStopBtn.innerText = "Start";
+                pauseResumeBtn.style.display = "none";
+            } else {
+                startTime = Date.now();
+                timerInterval = setInterval(updateClock, 1000);
+                startStopBtn.innerText = "Stop";
+                pauseResumeBtn.style.display = "inline";
+            }
+            isRunning = !isRunning;
+        }
+
+        function pauseResumeTimer() {
+            if (isPaused) {
+                startTime = Date.now() - elapsedTime;
+                timerInterval = setInterval(updateClock, 1000);
+                pauseResumeBtn.innerText = "Pause";
+            } else {
+                elapsedTime += Date.now() - startTime;
+                clearInterval(timerInterval);
+                pauseResumeBtn.innerText = "Resume";
+            }
+            isPaused = !isPaused;
+        }
+
+        function resetTimer() {
+            clearInterval(timerInterval);
+            isRunning = false;
+            isPaused = false;
+            elapsedTime = 0;
+            updateClock();
+            startStopBtn.innerText = "Start";
+            pauseResumeBtn.style.display = "none";
+            lapsList.innerHTML = '';
+            localStorage.removeItem('laps');
+        }
+
+        function recordLap() {
+            if (isRunning) {
+                let lapTime = hrs.innerText + ":" + mins.innerText + ":" + secs.innerText;
+                let lapItem = document.createElement("li");
+                lapItem.innerText = "Lap: " + lapTime;
+                lapsList.appendChild(lapItem);
+                saveLaps();
+            }
+        }
+
+        function recordSplit() {
+            if (isRunning) {
+                let splitTime = hrs.innerText + ":" + mins.innerText + ":" + secs.innerText;
+                let splitItem = document.createElement("li");
+                splitItem.innerText = "Split: " + splitTime;
+                lapsList.appendChild(splitItem);
+                saveLaps();
+            }
+        }
+
+        function toggleTheme() {
+            if (theme === 'dark') {
+                document.documentElement.style.setProperty('--bg-color', '#fff');
+                document.documentElement.style.setProperty('--text-color', '#000');
+                theme = 'light';
+            } else {
+                document.documentElement.style.setProperty('--bg-color', '#08001f');
+                document.documentElement.style.setProperty('--text-color', '#fff');
+                theme = 'dark';
+            }
+        }
+
+        function startCountdown() {
+            let hours = parseInt(setHrs.value) || 0;
+            let minutes = parseInt(setMins.value) || 0;
+            let seconds = parseInt(setSecs.value) || 0;
+            countdownTime = (hours * 3600 + minutes * 60 + seconds) * 1000;
+            isCountdown = true;
+            startTime = Date.now();
+            timerInterval = setInterval(updateCountdown, 1000);
+            startStopBtn.innerText = "Stop";
+        }
+
+        function updateCountdown() {
+            let currentTime = Date.now();
+            let remainingTime = countdownTime - (currentTime - startTime);
+
+            if (remainingTime <= 0) {
+                clearInterval(timerInterval);
+                hrs.innerText = "00";
+                mins.innerText = "00";
+                secs.innerText = "00";
+                alert("Time's up!");
+                let audio = new Audio(alarmSound.value);
+                audio.play();
+                return;
+            }
+
+            let hours = Math.floor(remainingTime / 3600000);
+            let minutes = Math.floor((remainingTime % 3600000) / 60000);
+            let seconds = Math.floor((remainingTime % 60000) / 1000);
+
+            hrs.innerHTML = (hours < 10 ? "0" : "") + hours;
+            mins.innerHTML = (minutes < 10 ? "0" : "") + minutes;
+            secs.innerHTML = (seconds < 10 ? "0" : "") + seconds;
+        }
+
+        function saveLaps() {
+            let laps = [];
+            lapsList.querySelectorAll("li").forEach(lapItem => {
+                laps.push(lapItem.innerText);
+            });
+            localStorage.setItem('laps', JSON.stringify(laps));
+        }
+
+        function loadLaps() {
+            let laps = JSON.parse(localStorage.getItem('laps')) || [];
+            laps.forEach(lapText => {
+                let lapItem = document.createElement("li");
+                lapItem.innerText = lapText;
+                lapsList.appendChild(lapItem);
+            });
+        }
+
+        function saveSession() {
+            let sessionTime = hrs.innerText + ":" + mins.innerText + ":" + secs.innerText;
+            let sessions = JSON.parse(localStorage.getItem('sessions')) || [];
+            sessions.push(sessionTime);
+            localStorage.setItem('sessions', JSON.stringify(sessions));
+            loadHistory();
+        }
+
+        function loadHistory() {
+            let sessions = JSON.parse(localStorage.getItem('sessions')) || [];
+            historyList.innerHTML = '';
+            sessions.forEach(sessionTime => {
+                let sessionItem = document.createElement("li");
+                sessionItem.innerText = sessionTime;
+                historyList.appendChild(sessionItem);
+            });
+        }
+
+        function clearHistory() {
+            localStorage.removeItem('sessions');
+            loadHistory();
+        }
+
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 's') startStopTimer();
+            if (event.key === 'r') resetTimer();
+            if (event.key === 'l') recordLap();
+        });
+
+        startStopBtn.addEventListener("click", startStopTimer);
+        pauseResumeBtn.addEventListener("click", pauseResumeTimer);
+        resetBtn.addEventListener("click", resetTimer);
+        lapBtn.addEventListener("click", recordLap);
+        splitBtn.addEventListener("click", recordSplit);
+        themeBtn.addEventListener("click", toggleTheme);
+        startCountdownBtn.addEventListener("click", startCountdown);
+        saveSessionBtn.addEventListener("click", saveSession);
+        clearHistoryBtn.addEventListener("click", clearHistory);
+
+        loadLaps();
+        loadHistory();
+        updateClock();
+    </script>
+</body>
+</html> -->
